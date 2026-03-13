@@ -1,5 +1,5 @@
 use clap::Parser;
-use cluster_event::{clust_analysis, clust_analysis_cutoff, load_hdf5, write_hdf5, Event};
+use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, load_hdf5, load_hdf5_parallel, write_hdf5};
 use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
@@ -49,11 +49,12 @@ fn main() -> std::io::Result<()> {
         calc_sum(&args.file, args.eps_pixel, args.eps_time, args.cutoff)?;
         return Ok(());
     }
-    println!("reading h5...");
-    let hits: Vec<Event> = load_hdf5(&args.file).unwrap();
-    println!("finished reading h5");
+
 
     if args.n_threads == 1 {
+        println!("reading h5...");
+        let hits: Vec<Event> = load_hdf5(&args.file).unwrap();
+        println!("finished reading h5");
         if args.cutoff == 0 {
             let clusters = clust_analysis(&hits, args.eps_pixel, args.eps_time);
             println!("Found {} clusters", clusters.len());
@@ -66,9 +67,12 @@ fn main() -> std::io::Result<()> {
     }
     // for multi thread processing:
     else {
-        println!("beginning multi threading");
+        println!("reading h5...");
+        let hits: Vec<Event> = load_hdf5_parallel(&args.file, &args.n_threads).unwrap();
+        println!("finished reading h5");
 
         let n_hits: usize = hits.len();
+        println!("nhits = {}", n_hits);
         let n_threads: usize = args.n_threads;
         let hit_section_len: usize = n_hits.div_ceil(n_threads);
         scope(|s| {

@@ -2,6 +2,7 @@ mod paper;
 pub mod slow_ref;
 use hdf5::file::File;
 use std::cmp::min;
+use std::thread::{scope};
 
 pub struct Event {
     x: u16,
@@ -78,7 +79,7 @@ pub fn load_hdf5(path: &str) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
         min(data_toa.len(), data_tot.len()),
     );
     let mut out_vec = Vec::<Event>::with_capacity(num_events);
-
+    println!("entering loop");
     for index in 0..num_events {
         let x = data_x[index];
         let y = data_y[index];
@@ -92,8 +93,71 @@ pub fn load_hdf5(path: &str) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
         };
         out_vec.push(st);
     }
+    println!("exiting loop");
 
     return Ok(out_vec);
+}
+/*
+loads events from hdf5 parralel and assembles them in parallel
+*/
+pub fn load_hdf5_parallel(path: &str, &n_threads: &usize) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
+    let file: File = File::open(path)?;
+    let ds = file.dataset("/x")?; // open the datasets
+    let data_x = ds.read_1d::<u16>()?;
+
+    let ds = file.dataset("/y")?; // open the datasets
+    let data_y = ds.read_1d::<u16>()?;
+
+    let ds = file.dataset("/tot")?; // open the datasets
+    let data_tot = ds.read_1d::<u16>()?;
+
+    let ds = file.dataset("/toa")?; // open the datasets
+    let data_toa = ds.read_1d::<i64>()?;
+
+    let num_events = min(
+        min(data_x.len(), data_y.len()),
+        min(data_toa.len(), data_tot.len()),
+    );
+    let out_vec = scope(|s| {
+        let mut out_vec = Vec::<Event>::with_capacity(num_events);
+        let mut threads = Vec::new();
+        let chunk_size: usize = num_events.div_ceil(n_threads);
+        let data_x = &data_x;
+        let data_y = &data_y;
+        let data_tot = &data_tot;
+        let data_toa = &data_toa;
+
+
+        for i in 0..n_threads { 
+            let start_idx = i*chunk_size;
+            let end_idx = min(start_idx + chunk_size, num_events);
+            threads.push(s.spawn( move || {
+                println!("starting hit values to Events thread");
+                let mut out_vec_chunk = Vec::new();
+                for index in start_idx..end_idx {
+                    let x = data_x[index];
+                    let y = data_y[index];
+                    let tot = data_tot[index];
+                    let toa = data_toa[index];
+                    let st = Event {
+                        x: x,
+                        y: y,
+                        time: toa,
+                        intens: tot,
+                    };
+                    out_vec_chunk.push(st);
+                }
+                out_vec_chunk
+            }));
+        }
+        for thread in threads{
+            out_vec.extend(thread.join().unwrap())
+        }
+        return out_vec;
+        
+    });  
+    return Ok(out_vec);
+  
 }
 /*
  * Calculates abs(x-y) of unsigned integer variables
