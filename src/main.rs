@@ -1,5 +1,5 @@
 use clap::Parser;
-use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, load_hdf5, load_hdf5_parallel, write_hdf5};
+use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, clust_analysis_cutoff_highest_toa, load_hdf5, load_hdf5_parallel, write_hdf5};
 use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
@@ -84,7 +84,7 @@ fn main() -> std::io::Result<()> {
                 // threads start running here:
                 threads.push(s.spawn(|| {
                     println!("starting a thread");
-                    clust_analysis_cutoff(hits_section, args.eps_pixel, args.eps_time, args.cutoff)
+                    clust_analysis_cutoff_highest_toa(hits_section, args.eps_pixel, args.eps_time, args.cutoff)
                 }));
             }
             for thread in threads{

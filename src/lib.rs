@@ -217,6 +217,57 @@ pub fn clust_analysis_cutoff(
     return extracted_cluster;
 }
 
+pub fn clust_analysis_cutoff_highest_toa(
+    hits: &[Event],
+    eps_space: u16,
+    eps_time: f64,
+    cut_off: usize,
+) -> Vec<Clust> {
+    let eps_time_count = (eps_time / 1e-12) as i64; // time is kept as int for faster computation
+
+    let mut extracted_cluster = Vec::<Clust>::with_capacity(hits.len() / 2);
+
+    'outer: for hit in hits {
+        let total_len = extracted_cluster.len();
+        let start_idx = total_len.saturating_sub(cut_off);
+        for idx in start_idx..total_len {
+            let clust = &mut extracted_cluster[idx];
+            let clust_is_current = (hit.time - clust.time).abs() <= eps_time_count;
+            if !clust_is_current {
+                continue;
+            }
+
+            let close_to_cluster = abs_diff(hit.x, clust.x) + abs_diff(hit.y, clust.y) <= eps_space;
+            if close_to_cluster {
+                clust.size += 1;
+                clust.sum += hit.intens;
+                if clust.intens < hit.intens {
+                    clust.intens = hit.intens;
+                // cluster time is max time observed
+                // cluster xy is max toa hit xy
+                if clust.time < hit.time{
+                    clust.time = hit.time;
+                    clust.x = hit.x;
+                    clust.y = hit.y;
+                }
+
+                }
+                continue 'outer;
+            }
+        }
+        let clust = Clust {
+            x: hit.x,
+            y: hit.y,
+            time: hit.time,
+            size: 1,
+            sum: hit.intens,
+            intens: hit.intens,
+        };
+        extracted_cluster.push(clust);
+    }
+    return extracted_cluster;
+}
+
 pub fn create_hits_slices(
     hits: &[Event], 
     n_threads: usize, 
