@@ -1,8 +1,11 @@
 mod paper;
 pub mod slow_ref;
-use hdf5::file::File;
+pub mod tpx;
+// use hdf5::file;
+// use hdf5::types::dyn_value;
 use std::cmp::min;
 use std::thread::{scope};
+
 
 pub struct Event {
     x: u16,
@@ -20,48 +23,12 @@ pub struct Clust {
     intens: u16,
 }
 
-pub fn write_hdf5(path: &str, clusters: &[Clust]) {
-    let num_events = clusters.len();
-    let mut data_x = Vec::<u16>::with_capacity(num_events);
-    let mut data_y = Vec::<u16>::with_capacity(num_events);
-    let mut data_size = Vec::<u16>::with_capacity(num_events);
-    let mut data_time = Vec::<i64>::with_capacity(num_events);
-    let mut data_intens = Vec::<u16>::with_capacity(num_events);
-    let mut data_sum = Vec::<u16>::with_capacity(num_events);
-    for clust in clusters {
-        data_x.push(clust.x);
-        data_y.push(clust.y);
-        data_size.push(clust.size);
-        data_time.push(clust.time);
-        data_intens.push(clust.intens);
-        data_sum.push(clust.sum);
-    }
-    let file = File::create(path).unwrap(); // open for writing
-    let group = file.create_group("dir").unwrap(); // create a group
-    let builder = group.new_dataset_builder();
-    builder.with_data(&data_x).create("x").unwrap();
-    let builder = group.new_dataset_builder();
-    builder.with_data(&data_y).create("y").unwrap();
-    let builder = group.new_dataset_builder();
-    builder.with_data(&data_size).create("size").unwrap();
-    let builder = group.new_dataset_builder();
-    builder.with_data(&data_time).create("time").unwrap();
-    let builder = group.new_dataset_builder();
-    builder
-        .with_data(&data_intens)
-        .create("max_intens")
-        .unwrap();
-    let builder = group.new_dataset_builder();
-    builder.with_data(&data_sum).create("sum_intens").unwrap();
-
-    file.flush().unwrap();
-}
 
 /*
  * Loads Events from a hdf5 file.
  */
 pub fn load_hdf5(path: &str) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
-    let file: File = File::open(path)?;
+    let file: hdf5::file::File = hdf5::file::File::open(path)?;
     let ds = file.dataset("/x")?; // open the datasets
     let data_x = ds.read_1d::<u16>()?;
 
@@ -101,7 +68,7 @@ pub fn load_hdf5(path: &str) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
 loads events from hdf5 parralel and assembles them in parallel
 */
 pub fn load_hdf5_parallel(path: &str, &n_threads: &usize) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
-    let file: File = File::open(path)?;
+    let file: hdf5::file::File = hdf5::file::File::open(path)?;
     let ds = file.dataset("/x")?; // open the datasets
     let data_x = ds.read_1d::<u16>()?;
 
@@ -133,7 +100,7 @@ pub fn load_hdf5_parallel(path: &str, &n_threads: &usize) -> Result<Vec<Event>, 
             let end_idx = min(start_idx + chunk_size, num_events);
             threads.push(s.spawn( move || {
                 println!("starting hit values to Events thread");
-                let mut out_vec_chunk = Vec::new();
+                let mut out_vec_chunk = Vec::with_capacity(2*num_events/n_threads); //events vectors should be n_events/n_threads long.
                 for index in start_idx..end_idx {
                     let x = data_x[index];
                     let y = data_y[index];
@@ -354,3 +321,71 @@ mod tests {
     }
 }
 
+
+pub fn write_hdf5_clust(path: &str, clusters: &[Clust]) {
+    let num_events = clusters.len();
+    let mut data_x = Vec::<u16>::with_capacity(num_events);
+    let mut data_y = Vec::<u16>::with_capacity(num_events);
+    let mut data_size = Vec::<u16>::with_capacity(num_events);
+    let mut data_time = Vec::<i64>::with_capacity(num_events);
+    let mut data_intens = Vec::<u16>::with_capacity(num_events);
+    let mut data_sum = Vec::<u16>::with_capacity(num_events);
+    for clust in clusters {
+        data_x.push(clust.x);
+        data_y.push(clust.y);
+        data_size.push(clust.size);
+        data_time.push(clust.time);
+        data_intens.push(clust.intens);
+        data_sum.push(clust.sum);
+    }
+    let file = hdf5::file::File::create(path).unwrap(); // open for writing
+    let group = file.create_group("dir").unwrap(); // create a group
+    let builder = group.new_dataset_builder();
+    builder.with_data(&data_x).create("x").unwrap();
+    let builder = group.new_dataset_builder();
+    builder.with_data(&data_y).create("y").unwrap();
+    let builder = group.new_dataset_builder();
+    builder.with_data(&data_size).create("size").unwrap();
+    let builder = group.new_dataset_builder();
+    builder.with_data(&data_time).create("time").unwrap();
+    let builder = group.new_dataset_builder();
+    builder
+        .with_data(&data_intens)
+        .create("max_intens")
+        .unwrap();
+    let builder = group.new_dataset_builder();
+    builder.with_data(&data_sum).create("sum_intens").unwrap();
+
+    file.flush().unwrap();
+}
+
+
+pub fn write_hdf5_event(path: &str, events: &[Event]) -> hdf5::Result<()> {
+    let num_events = events.len();
+
+    // Preallocate vectors for each field
+    let mut data_x = Vec::<u16>::with_capacity(num_events);
+    let mut data_y = Vec::<u16>::with_capacity(num_events);
+    let mut data_toa = Vec::<i64>::with_capacity(num_events);
+    let mut data_tot = Vec::<u16>::with_capacity(num_events);
+
+    // Fill vectors from events
+    for ev in events {
+        data_x.push(ev.x);
+        data_y.push(ev.y);
+        data_toa.push(ev.time);
+        data_tot.push(ev.intens);
+    }
+
+    // Create HDF5 file
+    let file = hdf5::file::File::create(path)?;
+
+    // Create datasets directly at the top level
+    file.new_dataset_builder().with_data(&data_x).create("x")?;
+    file.new_dataset_builder().with_data(&data_y).create("y")?;
+    file.new_dataset_builder().with_data(&data_toa).create("toa")?;
+    file.new_dataset_builder().with_data(&data_tot).create("tot")?;
+
+    file.flush()?;
+    Ok(())
+}

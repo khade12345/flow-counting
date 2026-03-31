@@ -1,0 +1,13 @@
+1. make sure capacities of vectors are defined to save extensive recopying.
+2. determine why only 600% of cpu used
+3. save TDC signals 
+4. merge clusters on boundaries when combining vectors of clusters.
+5. what about removing all clusters of size<2 or so. Does this remove dark noise?
+6. fix chip boundary issue
+
+minor:
+1. check if vec<u64> needed for header storage or u32 okay
+2. try compiling with different optimisation levels
+3. check cross ofset value should be 2 or 4
+4. events agree with tpx binary but disagree with the hitparser output. This needs to be checked.
+5. check if toa_phase_correction is needed

@@ -12,4 +12,9 @@ data/
 data_tpx/
 output_clusters_kuttruff/
 misc/
+hitparser_output/
 
+.DS_Store
+.DS_Store
+output_full.hdf5
+.gitignore

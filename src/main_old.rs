@@ -1,8 +1,5 @@
 use clap::Parser;
-use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, clust_analysis_cutoff_highest_toa, load_hdf5, load_hdf5_parallel};
-use cluster_event::{write_hdf5_event, write_hdf5_clust};
-
-use cluster_event::tpx::{load_tpx3, load_sort_tpx3_parralel};
+use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, clust_analysis_cutoff_highest_toa, load_hdf5, load_hdf5_parallel, write_hdf5};
 use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
@@ -34,74 +31,45 @@ struct Args {
     #[arg(short, long, default_value_t = 0)]
     cutoff: usize,
 
-    /// Output events/hits
-    #[arg(short, long, default_value_t = false)]
-    save_events: bool,
-    
-    /// Output HDF5 File for events/hits
-    #[arg(short = 'e', long)]
-    output_event: Option<String>,
-
-    /// Output HDF5 File for clusters
-    #[arg(short = 'o', long, default_value_t = ("clusters.hdf5").to_string())]
+    /// Output HDF5 File
+    #[arg(short, long, default_value_t = ("clusters.hdf5").to_string())]
     output: String,
-
+    
     /// Number of threads
     #[arg(short = 'n', long, default_value_t = 1)]
     n_threads: usize,
-
-    /// Min tot for electron hits
-    #[arg(short = 'm', long, default_value_t = 5)]
-    min_tot: u16,
 }
 
 
 
 fn main() -> std::io::Result<()> {
     let args = Args::parse();
-
-    let mut save_events = false; 
-    let mut save_path = "output_hits";
-    if let Some(path) = &args.output_event {
-        save_events = true; save_path = path;
-    }
-
     println!("File: {}", args.file);
     if args.bench {
         calc_sum(&args.file, args.eps_pixel, args.eps_time, args.cutoff)?;
         return Ok(());
     }
 
+
     if args.n_threads == 1 {
         println!("reading h5...");
         let hits: Vec<Event> = load_hdf5(&args.file).unwrap();
-        let n_hits: usize = hits.len();
-        println!("nhits = {}", n_hits);
         println!("finished reading h5");
         if args.cutoff == 0 {
             let clusters = clust_analysis(&hits, args.eps_pixel, args.eps_time);
             println!("Found {} clusters", clusters.len());
-            write_hdf5_clust(&args.output, &clusters);
+            write_hdf5(&args.output, &clusters);
         } else {
-            let clusters = clust_analysis_cutoff_highest_toa(&hits, args.eps_pixel, args.eps_time, args.cutoff);
+            let clusters = clust_analysis_cutoff(&hits, args.eps_pixel, args.eps_time, args.cutoff);
             println!("Found {} clusters", clusters.len());
-            println!("writing h5 file...");
-            write_hdf5_clust(&args.output, &clusters);
-            println!("done!")
+            write_hdf5(&args.output, &clusters);
         }
     }
-
     // for multi thread processing:
     else {
-        println!("reading TPX3...");
-        let hits: Vec<Event> = load_sort_tpx3_parralel(&args.file, &args.n_threads, &args.min_tot).unwrap();
-        println!("finished reading tpx");
-
-
-        if save_events {
-            println!("writing hits...");
-            write_hdf5_event(&save_path, &hits).unwrap();
-        }
+        println!("reading h5...");
+        let hits: Vec<Event> = load_hdf5_parallel(&args.file, &args.n_threads).unwrap();
+        println!("finished reading h5");
 
         let n_hits: usize = hits.len();
         println!("nhits = {}", n_hits);
@@ -110,22 +78,22 @@ fn main() -> std::io::Result<()> {
         scope(|s| {
             let mut threads= Vec::with_capacity(n_threads);
             let mut clusters = Vec::with_capacity(n_hits/2);
+
+
             for hits_section in hits.chunks(hit_section_len) {
                 // threads start running here:
                 threads.push(s.spawn(|| {
-                    println!("clustering hits thread started");
+                    println!("starting a thread");
                     clust_analysis_cutoff_highest_toa(hits_section, args.eps_pixel, args.eps_time, args.cutoff)
                 }));
             }
             for thread in threads{
                 // wait for each thread to finish before appending its result to clusterd hits:
-                clusters.extend(thread.join().unwrap());
-                println!("clustering hits thread finished");
+                println!("attempting to join thread");
+                clusters.extend(thread.join().unwrap())
             }
             println!("clusters length {}",clusters.len());
-            println!("writing h5 file...");
-            write_hdf5_clust(&args.output, &clusters);
-            println!("done!")
+            write_hdf5(&args.output, &clusters);
         });
 
  

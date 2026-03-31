@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.2.1", features = ["derive"] }
 hdf5 = "0.8.1"
+memmap2 = "0.9"
+rayon = "1.10"
 
 [dev-dependencies]
 criterion = "0.3"
