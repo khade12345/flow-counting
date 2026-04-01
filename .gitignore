@@ -18,3 +18,4 @@ hitparser_output/
 .DS_Store
 output_full.hdf5
 .gitignore
+.DS_Store
