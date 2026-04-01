@@ -1,16 +1,23 @@
 # flow-counting
 
-A reference implementation of the flow-counting algorithm for a hybrid pixel detector.
+A reference implementation of the flow-counting algorithm for a hybrid pixel detector. 
+This is a fork of the code by Kuttruff et al. 
+https://github.com/m31k0r/flow-counting/actions/workflows/rust.yml/badge.svg
 
-![build](https://github.com/m31k0r/flow-counting/actions/workflows/rust.yml/badge.svg)
+Features:
+- Added reading of TPX3 files
+- Added the option to output unclustered hits/events
+- Parallelised file reading and clustering
+
+Example use:
+`time cargo run -- --eps-time=50e-9 --eps-pixel=5 --cutoff=10 --n-threads=8 --file ./data_tpx/raw_events_1kx1k_10us_30mhits.tpx3 --output-event hits.hdf5 --output clusters.hdf5`
+
+This can run >30Mhits/s on an M1 Macbook Pro
 
 ## Implementation Detail
-
-For the general idea of the algorithm see our publication in [Ultramicroscopy](https://doi.org/10.1016/j.ultramic.2023.113864)
-
 To minimize costly moves, we merged the output and buffer to one vector, and only compare with the *B* last elements in the output.
 
-If you want to deploy this algorithm in a real-time toolchain, you only have to change the input vector *hits* and the output vector *extracted_cluster* to a single-consumer-single-producer buffer. (Mind, that it should be optimized to allow a fast enough memory throughput).
+If you want to deploy this algorithm in a real-time toolchain it should be optimized to allow a fast enough memory throughput.
 
 ## Usage
 

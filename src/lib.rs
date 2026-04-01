@@ -46,22 +46,14 @@ pub fn load_hdf5(path: &str) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
         min(data_toa.len(), data_tot.len()),
     );
     let mut out_vec = Vec::<Event>::with_capacity(num_events);
-    println!("entering loop");
     for index in 0..num_events {
-        let x = data_x[index];
-        let y = data_y[index];
-        let tot = data_tot[index];
-        let toa = data_toa[index];
-        let st = Event {
-            x: x,
-            y: y,
-            time: toa,
-            intens: tot,
-        };
-        out_vec.push(st);
+        out_vec.push(Event {
+            x: data_x[index],
+            y: data_y[index],
+            time: data_toa[index],
+            intens: data_tot[index],
+        });
     }
-    println!("exiting loop");
-
     return Ok(out_vec);
 }
 /*

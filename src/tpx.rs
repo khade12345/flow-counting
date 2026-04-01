@@ -12,47 +12,26 @@ pub struct Chunk {
 /*
  * Loads Events from a TPX3 file.
  */
-pub fn load_tpx3(path: &str, n_threads: &usize, tot_threshold: &u16) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
-    let file = std::fs::File::open(path)?;
-    let mmap = unsafe { memmap2::Mmap::map(&file)? };
-
-    let chunks = find_chunks(&mmap).unwrap();
-    println!("Found {} chunks", chunks.len());
-
-    let out_vec = process_chunks(&chunks, &mmap, tot_threshold).unwrap();
-    
-    Ok(out_vec)
-
-}
-
-/*
- * Loads Events from a TPX3 file.
- */
-pub fn load_sort_tpx3_parralel(path: &str, n_threads: &usize, tot_threshold: &u16) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
+pub fn load_tpx3(path: &str, n_threads: usize, tot_threshold: u16, sort_window: usize) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path)?;
     let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
     let tpx_chunks = find_chunks(&mmap).unwrap();
     println!("Found {} TPX3 chunks", tpx_chunks.len());
 
-
-    // Sorting
-
     println!("Translating and sorting chunks.");    
 
-    let mut out_vec = scope(|s| {
+    let out_vec = scope(|s| {
         let mmap_ref = &mmap;
-        let mut out_vec: Vec<Event> = Vec::<Event>::with_capacity(*n_threads);
-        let mut threads = Vec::with_capacity(*n_threads);
+        let mut out_vec: Vec<Event> = Vec::<Event>::with_capacity(n_threads);
+        let mut threads = Vec::with_capacity(n_threads);
 
         let n_chunks = tpx_chunks.len();
-        let chunk_segment: usize = n_chunks.div_ceil(*n_threads);
+        let chunk_segment: usize = n_chunks.div_ceil(n_threads);
         for chunks_list in tpx_chunks.chunks(chunk_segment) { 
             threads.push(s.spawn( move || {
                     println!("read + sort tpx thread started!");
-                    let mut out_vec_chunk = Vec::with_capacity(chunks_list.len()*2000); //around 900 hits per chunk
-                    out_vec_chunk.extend(process_chunks(chunks_list, mmap_ref, tot_threshold).unwrap());
-                out_vec_chunk
+                process_chunks(chunks_list, mmap_ref, &tot_threshold).unwrap()
             }));
         }
         for thread in threads{
@@ -60,7 +39,7 @@ pub fn load_sort_tpx3_parralel(path: &str, n_threads: &usize, tot_threshold: &u1
             println!("read + sort tpx thread finished!");
         }
         println!("sorting!");
-        for chunk_vec in out_vec.chunks_mut(10_000) {
+        for chunk_vec in out_vec.chunks_mut(sort_window) {
             chunk_vec.sort_unstable_by(|a, b| a.time.cmp(&b.time));
         }
         println!("sorted!");
@@ -195,13 +174,14 @@ fn process_chunks(chunks: &[Chunk], mmap: &Mmap, &tot_threshold: &u16) -> Result
     for chunk in chunks.iter() {
         let payload_start: usize = chunk.start;
         let payload_size = chunk.payload_size as usize;
+        let payload_end = payload_start + payload_size;
         let chip_idx = chunk.chip_idx;
 
         
         let mut cursor = payload_start+8;
         let mut chunk_vec: Vec<Event> = Vec::with_capacity(10000);
 
-        while cursor + 8 <= payload_start+payload_size{
+        while cursor + 8 <= payload_end{
             let pkg = u64::from_le_bytes(mmap[cursor..cursor+8].try_into()?);
 
             if pkg>>60 == 0xb {

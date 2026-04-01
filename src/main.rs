@@ -2,7 +2,7 @@ use clap::Parser;
 use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, clust_analysis_cutoff_highest_toa, load_hdf5, load_hdf5_parallel};
 use cluster_event::{write_hdf5_event, write_hdf5_clust};
 
-use cluster_event::tpx::{load_tpx3, load_sort_tpx3_parralel};
+use cluster_event::tpx::{load_tpx3};
 use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
@@ -27,7 +27,7 @@ struct Args {
     eps_pixel: u16,
 
     /// Maximum Time distance [s]
-    #[arg(short = 't', long, default_value_t = 500e-9)]
+    #[arg(short = 't', long, default_value_t = 50e-9)]
     eps_time: f64,
 
     /// Length of the Buffer
@@ -46,13 +46,17 @@ struct Args {
     #[arg(short = 'o', long, default_value_t = ("clusters.hdf5").to_string())]
     output: String,
 
-    /// Number of threads
+    /// Number of threads for parallel processing
     #[arg(short = 'n', long, default_value_t = 1)]
     n_threads: usize,
 
-    /// Min tot for electron hits
+    /// Min tot for electron hits. tot's below this will be discarded when reading .tpx3
     #[arg(short = 'm', long, default_value_t = 5)]
     min_tot: u16,
+
+    /// Sort window size for TPX3 data (longer is better)
+    #[arg(short = 's', long, default_value_t = 10_000)]
+    sort_window: usize,
 }
 
 
@@ -94,7 +98,7 @@ fn main() -> std::io::Result<()> {
     // for multi thread processing:
     else {
         println!("reading TPX3...");
-        let hits: Vec<Event> = load_sort_tpx3_parralel(&args.file, &args.n_threads, &args.min_tot).unwrap();
+        let hits: Vec<Event> = load_tpx3(&args.file, args.n_threads, args.min_tot, args.sort_window).unwrap();
         println!("finished reading tpx");
 
 
