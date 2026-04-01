@@ -2,6 +2,8 @@ use memmap2::Mmap;
 // use rayon::prelude::*;
 use crate::{Event};
 use std::thread::{scope};
+use rayon::prelude::*;
+
 
 pub struct Chunk { 
     start: usize, //excluding header
@@ -12,7 +14,7 @@ pub struct Chunk {
 /*
  * Loads Events from a TPX3 file.
  */
-pub fn load_tpx3(path: &str, n_threads: usize, tot_threshold: u16, sort_window: usize) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
+pub fn load_tpx3(path: &str, n_threads: usize, tot_threshold: u16) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path)?;
     let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
@@ -39,24 +41,13 @@ pub fn load_tpx3(path: &str, n_threads: usize, tot_threshold: u16, sort_window: 
             println!("read + sort tpx thread finished!");
         }
         println!("sorting!");
-        for chunk_vec in out_vec.chunks_mut(sort_window) {
-            chunk_vec.sort_unstable_by(|a, b| a.time.cmp(&b.time));
-        }
+        // for chunk_vec in out_vec.chunks_mut(sort_window) {
+        //     chunk_vec.par_sort_unstable_by(|a, b| a.time.cmp(&b.time));
+        // }
+        out_vec.par_sort_unstable_by(|a, b| a.time.cmp(&b.time));
         println!("sorted!");
         out_vec
     });
-
-    
-    // println!("sorting");
-    // let window_size = 10_000;
-    // for segment in out_vec.chunks_mut(window_size) {
-    //     segment.sort_by(|a, b| a.time.cmp(&b.time));
-    // }
-
-    // // out_vec.par_chunks_mut(window_size)
-    // // .for_each(|segment| {
-    // //     segment.sort_by(|a, b| a.time.cmp(&b.time));
-    // // });
 
     Ok(out_vec)
 

@@ -58,19 +58,12 @@ pub fn load_hdf5(path: &str) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
 /*
 loads events from hdf5 parralel and assembles them in parallel
 */
-pub fn load_hdf5_parallel(path: &str, &n_threads: &usize) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
+pub fn load_hdf5_parallel(path: &str, n_threads: &usize) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
     let file: hdf5::file::File = hdf5::file::File::open(path)?;
-    let ds = file.dataset("/x")?; // open the datasets
-    let data_x = ds.read_1d::<u16>()?;
-
-    let ds = file.dataset("/y")?; // open the datasets
-    let data_y = ds.read_1d::<u16>()?;
-
-    let ds = file.dataset("/tot")?; // open the datasets
-    let data_tot = ds.read_1d::<u16>()?;
-
-    let ds = file.dataset("/toa")?; // open the datasets
-    let data_toa = ds.read_1d::<i64>()?;
+    let data_x = file.dataset("/x")?.read_1d::<u16>()?;
+    let data_y = file.dataset("/y")?.read_1d::<u16>()?;
+    let data_tot = file.dataset("/tot")?.read_1d::<u16>()?;
+    let data_toa = file.dataset("/toa")?.read_1d::<i64>()?;
 
     let num_events = min(
         min(data_x.len(), data_y.len()),
@@ -79,43 +72,37 @@ pub fn load_hdf5_parallel(path: &str, &n_threads: &usize) -> Result<Vec<Event>, 
     let out_vec = scope(|s| {
         let mut out_vec = Vec::<Event>::with_capacity(num_events);
         let mut threads = Vec::new();
-        let chunk_size: usize = num_events.div_ceil(n_threads);
+        let chunk_size: usize = num_events.div_ceil(*n_threads);
         let data_x = &data_x;
         let data_y = &data_y;
         let data_tot = &data_tot;
         let data_toa = &data_toa;
 
-
-        for i in 0..n_threads { 
-            let start_idx = i*chunk_size;
+        for i in 0..*n_threads { 
+            let start_idx = i * chunk_size;
             let end_idx = min(start_idx + chunk_size, num_events);
-            threads.push(s.spawn( move || {
-                println!("starting hit values to Events thread");
-                let mut out_vec_chunk = Vec::with_capacity(2*num_events/n_threads); //events vectors should be n_events/n_threads long.
+            threads.push(s.spawn(move || {
+                println!("starting hits events thread...");
+                let mut out_vec_chunk = Vec::with_capacity(end_idx - start_idx);
                 for index in start_idx..end_idx {
-                    let x = data_x[index];
-                    let y = data_y[index];
-                    let tot = data_tot[index];
-                    let toa = data_toa[index];
-                    let st = Event {
-                        x: x,
-                        y: y,
-                        time: toa,
-                        intens: tot,
-                    };
-                    out_vec_chunk.push(st);
+                    out_vec_chunk.push(Event {
+                        x: data_x[index],
+                        y: data_y[index],
+                        time: data_toa[index],
+                        intens: data_tot[index],
+                    });
                 }
                 out_vec_chunk
             }));
         }
-        for thread in threads{
-            out_vec.extend(thread.join().unwrap())
+        for thread in threads {
+            out_vec.extend(thread.join().unwrap());
+            println!("completed hits to events thread...");
+ 
         }
-        return out_vec;
-        
-    });  
-    return Ok(out_vec);
-  
+        out_vec
+    });
+    Ok(out_vec)
 }
 /*
  * Calculates abs(x-y) of unsigned integer variables
@@ -129,7 +116,7 @@ fn abs_diff(x: u16, y: u16) -> u16 {
 /*
  * Cluster analysis using a cutoff and no dynamic buffer size
  */
-pub fn clust_analysis_cutoff(
+pub fn clust_analysis_cutoff_max_intens(
     hits: &[Event],
     eps_space: u16,
     eps_time: f64,
@@ -175,7 +162,42 @@ pub fn clust_analysis_cutoff(
     return extracted_cluster;
 }
 
-pub fn clust_analysis_cutoff_highest_toa(
+
+pub fn cluster_hits(hits: &[Event], 
+                eps_pixel: u16, 
+                eps_time: f64, 
+                cutoff: usize, 
+                n_threads: usize) -> Result<Vec<Clust>, Box<dyn std::error::Error>> {
+
+    let n_hits = hits.len();
+    println!("nhits = {}", n_hits);
+    let hit_section_len = n_hits.div_ceil(n_threads);
+    
+    scope(|s| {
+        let mut threads = Vec::with_capacity(n_threads);
+        let mut clusters = Vec::with_capacity(n_hits / 2);
+        
+        for hits_section in hits.chunks(hit_section_len) {
+            threads.push(s.spawn(|| {
+                println!("clustering hits thread started");
+                clust_analysis_cutoff(hits_section, eps_pixel, eps_time, cutoff)
+            }));
+        }
+        
+        for thread in threads {
+            clusters.extend(thread.join().unwrap());
+            println!("clustering hits thread finished");
+        }
+        
+        println!("clusters length {}", clusters.len());
+        Ok(clusters)
+    })
+}
+
+/*
+ * Cluster hits with cluster positions based on max toa.
+ */
+pub fn clust_analysis_cutoff( 
     hits: &[Event],
     eps_space: u16,
     eps_time: f64,
@@ -225,6 +247,7 @@ pub fn clust_analysis_cutoff_highest_toa(
     }
     return extracted_cluster;
 }
+
 
 pub fn create_hits_slices(
     hits: &[Event], 

@@ -9,6 +9,7 @@ edition = "2021"
 clap = { version = "4.2.1", features = ["derive"] }
 hdf5 = "0.8.1"
 memmap2 = "0.9"
+rayon = "1.7"
 [dev-dependencies]
 criterion = "0.3"
 
@@ -21,5 +22,5 @@ overflow-checks = false
 lto = true
 panic = 'unwind'
 incremental = false
-codegen-units = 16
 rpath = false
+codegen-units = 1  # Forces the compiler to look at everything as one piece
