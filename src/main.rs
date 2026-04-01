@@ -1,5 +1,5 @@
 use clap::Parser;
-use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, clust_analysis_cutoff_highest_toa, load_hdf5, load_hdf5_parallel};
+use cluster_event::{Event, clust_analysis, clust_analysis_cutoff, clust_analysis_cutoff_highest_toa, load_hdf5};
 use cluster_event::{write_hdf5_event, write_hdf5_clust};
 
 use cluster_event::tpx::{load_tpx3};

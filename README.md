@@ -10,7 +10,10 @@ Features:
 - Parallelised file reading and clustering
 
 Example use:
+`cargo run -- --help`
+
 `time cargo run -- --eps-time=50e-9 --eps-pixel=5 --cutoff=10 --n-threads=8 --file ./data_tpx/raw_events_1kx1k_10us_30mhits.tpx3 --output-event hits.hdf5 --output clusters.hdf5`
+
 
 This can run >30Mhits/s on an M1 Macbook Pro
 

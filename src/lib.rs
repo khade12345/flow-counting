@@ -1,4 +1,3 @@
-mod paper;
 pub mod slow_ref;
 pub mod tpx;
 // use hdf5::file;
