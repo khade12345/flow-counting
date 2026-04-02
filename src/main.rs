@@ -28,7 +28,7 @@ struct Args {
     cutoff: usize,
     
     /// Output HDF5 File for events/hits
-    #[arg(short = 'h', long)]
+    #[arg(short = 'e', long)]
     output_hits: Option<String>,
 
     /// Output HDF5 File for clusters

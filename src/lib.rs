@@ -1,4 +1,3 @@
-pub mod slow_ref;
 pub mod tpx;
 // use hdf5::file;
 // use hdf5::types::dyn_value;
@@ -307,33 +306,6 @@ pub fn clust_analysis(hits: &[Event], eps_space: u16, eps_time: f64) -> Vec<Clus
     return extracted_cluster;
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::{
-        clust_analysis, clust_analysis_cutoff, load_hdf5, slow_ref::clust_analysis_with_ring,
-    };
-
-    #[test]
-    fn compare_impl() {
-        let path = "./example_measurement.hdf5";
-        let hits = load_hdf5(&path).unwrap();
-        let clusters = clust_analysis(&hits, 5, 500e-9);
-        let clusters_cutoff = clust_analysis_cutoff(&hits, 5, 500e-9, 5);
-        let clusters_ring = clust_analysis_with_ring(&hits, 5, 500e-9);
-        assert_eq!(clusters_ring.len(), clusters.len());
-        for (c1, c2) in clusters.iter().zip(clusters_ring.iter()) {
-            assert_eq!(c1.x, c2.x);
-            assert_eq!(c1.y, c2.y);
-            assert_eq!(c1.intens, c2.intens);
-        }
-        assert_eq!(clusters_cutoff.len(), clusters.len());
-        for (c1, c2) in clusters.iter().zip(clusters_cutoff.iter()) {
-            assert_eq!(c1.x, c2.x);
-            assert_eq!(c1.y, c2.y);
-            assert_eq!(c1.intens, c2.intens);
-        }
-    }
-}
 
 
 pub fn write_hdf5_clust(path: &str, clusters: &[Clust]) {
