@@ -32,19 +32,19 @@ pub fn load_tpx3(path: &str, n_threads: usize, tot_threshold: u16) -> Result<Vec
         let chunk_segment: usize = n_chunks.div_ceil(n_threads);
         for chunks_list in tpx_chunks.chunks(chunk_segment) { 
             threads.push(s.spawn( move || {
-                    println!("read + sort tpx thread started!");
+                    println!("read tpx thread started!");
                 process_chunks(chunks_list, mmap_ref, &tot_threshold).unwrap()
             }));
         }
         for thread in threads{
             out_vec.extend(thread.join().unwrap());
-            println!("read + sort tpx thread finished!");
+            println!("read tpx thread finished!");
         }
         println!("sorting!");
-        // for chunk_vec in out_vec.chunks_mut(sort_window) {
-        //     chunk_vec.par_sort_unstable_by(|a, b| a.time.cmp(&b.time));
-        // }
-        out_vec.par_sort_unstable_by(|a, b| a.time.cmp(&b.time));
+        for chunk_vec in out_vec.chunks_mut(300_000_000) {
+            chunk_vec.par_sort_unstable_by(|a, b| a.time.cmp(&b.time));
+        }
+        // out_vec.par_sort_unstable_by(|a, b| a.time.cmp(&b.time));
         println!("sorted!");
         out_vec
     });
