@@ -16,8 +16,10 @@ pub struct Chunk {
  */
 pub fn load_tpx3(path: &str, n_threads: usize, tot_threshold: u16) -> Result<Vec<Event>, Box<dyn std::error::Error>> {
     let file = std::fs::File::open(path)?;
-    let mmap = unsafe { memmap2::Mmap::map(&file)? };
+    println!("Creating mmap");
+    let mmap: Mmap = unsafe { memmap2::Mmap::map(&file)? };
 
+    println!("Finding chunks");
     let tpx_chunks = find_chunks(&mmap).unwrap();
     println!("Found {} TPX3 chunks", tpx_chunks.len());
 

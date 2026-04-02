@@ -24,7 +24,7 @@ struct Args {
     eps_time: f64,
 
     /// Length of the Buffer
-    #[arg(short, long, default_value_t = 0)]
+    #[arg(short, long, default_value_t = 10)]
     cutoff: usize,
     
     /// Output HDF5 File for events/hits
